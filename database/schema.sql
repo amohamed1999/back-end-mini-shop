@@ -35,7 +35,7 @@ alter table categories enable row level security;
 -- ──────────────────────────────────────────────────────────────
 create table if not exists products (
   id           uuid primary key default gen_random_uuid(),
-  name         text not null,
+  name         text not null unique,
   description  text,
   price        numeric(12, 2) not null check (price >= 0),
   image_url    text,

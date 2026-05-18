@@ -62,13 +62,14 @@ async function upsertUser(u: (typeof USERS)[0]) {
     console.log(`  ✅  Created auth user: ${u.email}`);
   }
 
-  // Upsert profile
+  // Upsert profile (runs even when auth user already existed)
   const { error: profileError } = await admin
     .from('profiles')
-    .upsert({ id: userId, name: u.name, role: u.role });
+    .upsert({ id: userId, name: u.name, role: u.role }, { onConflict: 'id' });
 
   if (profileError) throw new Error(`profile upsert: ${profileError.message}`);
 
+  console.log(`  ✅  Profile ready: ${u.email} (${u.role})`);
   return userId;
 }
 
@@ -160,13 +161,22 @@ async function seed() {
     },
   ];
 
-  const { data: products, error: prodError } = await admin
-    .from('products')
-    .upsert(PRODUCTS, { onConflict: 'name' })
-    .select();
+  let productCount = 0;
+  for (const p of PRODUCTS) {
+    const { data: existing } = await admin
+      .from('products')
+      .select('id')
+      .eq('name', p.name)
+      .maybeSingle();
 
-  if (prodError) throw new Error(`products: ${prodError.message}`);
-  console.log(`  ✅  ${products?.length} products`);
+    const { error: prodError } = existing
+      ? await admin.from('products').update(p).eq('id', existing.id)
+      : await admin.from('products').insert(p);
+
+    if (prodError) throw new Error(`products: ${prodError.message}`);
+    productCount++;
+  }
+  console.log(`  ✅  ${productCount} products`);
 
   console.log('\n✨  Seed complete!\n');
   console.log('  Admin:    admin@minishop.dev / Admin1234!');
